@@ -6,21 +6,73 @@ const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
 
-// path for enemies (straight path left to right)
+let gold = 100;
+let lives = 20;
+let wave = 0;
+let spawning = false;
+let waveRemaining = 0;
+
+// predefined zigzag path
 const path = [];
-for (let x = 0; x < MAP_WIDTH; x++) {
-    path.push({x, y: Math.floor(MAP_HEIGHT / 2)});
+function addLine(x0, y0, x1, y1) {
+    const dx = Math.sign(x1 - x0);
+    const dy = Math.sign(y1 - y0);
+    let x = x0, y = y0;
+    path.push({x, y});
+    while (x !== x1 || y !== y1) {
+        if (x !== x1) x += dx;
+        if (y !== y1) y += dy;
+        path.push({x, y});
+    }
 }
 
-// towers placed near the path
-const towers = [
-    {x: 5, y: Math.floor(MAP_HEIGHT / 2) - 1, cooldown: 0},
-    {x: 10, y: Math.floor(MAP_HEIGHT / 2) - 1, cooldown: 0}
-];
+addLine(0, Math.floor(MAP_HEIGHT / 2), 5, Math.floor(MAP_HEIGHT / 2));
+addLine(5, Math.floor(MAP_HEIGHT / 2), 5, MAP_HEIGHT - 3);
+addLine(5, MAP_HEIGHT - 3, 15, MAP_HEIGHT - 3);
+addLine(15, MAP_HEIGHT - 3, 15, 4);
+addLine(15, 4, MAP_WIDTH - 1, 4);
+
+// placed towers
+const towers = [];
 
 const enemies = [];
 const bullets = [];
 let tick = 0;
+
+const goldEl = document.getElementById('gold');
+const livesEl = document.getElementById('lives');
+const waveEl = document.getElementById('wave');
+const startBtn = document.getElementById('startWave');
+
+startBtn.addEventListener('click', () => {
+    if (!spawning && enemies.length === 0) startWave();
+});
+
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const gx = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+    const gy = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+    if (!isBuildable(gx, gy)) return;
+    const cost = 25;
+    if (gold >= cost) {
+        gold -= cost;
+        towers.push({x: gx, y: gy, cooldown: 0});
+    }
+});
+
+function isBuildable(x, y) {
+    if (path.find(p => p.x === x && p.y === y)) return false;
+    if (towers.find(t => t.x === x && t.y === y)) return false;
+    if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return false;
+    return true;
+}
+
+function startWave() {
+    wave++;
+    waveRemaining = 5 + wave * 2;
+    spawning = true;
+    startBtn.disabled = true;
+}
 
 function spawnEnemy() {
     enemies.push({pathIndex: 0, hp: 3, x: path[0].x, y: path[0].y});
@@ -28,7 +80,11 @@ function spawnEnemy() {
 
 function update() {
     tick++;
-    if (tick % 60 === 0) spawnEnemy();
+    if (spawning && waveRemaining > 0 && tick % 60 === 0) {
+        spawnEnemy();
+        waveRemaining--;
+        if (waveRemaining === 0) spawning = false;
+    }
 
     // move enemies along path
     for (const enemy of enemies) {
@@ -37,6 +93,8 @@ function update() {
             const p = path[Math.floor(enemy.pathIndex)];
             enemy.x = p.x;
             enemy.y = p.y;
+        } else {
+            enemy.reached = true;
         }
     }
 
@@ -67,11 +125,26 @@ function update() {
 
     // remove dead bullets and enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
-        if (enemies[i].hp <= 0 || enemies[i].pathIndex >= path.length - 1) enemies.splice(i, 1);
+        const e = enemies[i];
+        if (e.hp <= 0) {
+            enemies.splice(i, 1);
+            gold += 5;
+        } else if (e.reached) {
+            lives--;
+            enemies.splice(i, 1);
+        }
     }
     for (let i = bullets.length - 1; i >= 0; i--) {
         if (bullets[i].dead) bullets.splice(i, 1);
     }
+
+    if (!spawning && waveRemaining === 0 && enemies.length === 0) {
+        startBtn.disabled = false;
+    }
+
+    goldEl.textContent = gold;
+    livesEl.textContent = lives;
+    waveEl.textContent = wave;
 }
 
 function drawGrid() {
@@ -126,5 +199,9 @@ function loop() {
     draw();
     requestAnimationFrame(loop);
 }
+
+goldEl.textContent = gold;
+livesEl.textContent = lives;
+waveEl.textContent = wave;
 
 loop();
