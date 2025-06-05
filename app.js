@@ -5,6 +5,7 @@ const ctx = canvas.getContext('2d');
 const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
+const ENEMY_SPACING = 0.6; // minimum distance between enemies along the path
 
 let gold = 100;
 let lives = 20;
@@ -37,6 +38,7 @@ const towers = [];
 
 const enemies = [];
 const bullets = [];
+const damageTexts = [];
 let tick = 0;
 
 const goldEl = document.getElementById('gold');
@@ -105,14 +107,21 @@ function update() {
         if (waveRemaining === 0) spawning = false;
     }
 
-    // move enemies along path
-    for (const enemy of enemies) {
+    // move enemies along path and keep spacing
+    for (let i = 0; i < enemies.length; i++) {
+        const enemy = enemies[i];
         if (enemy.pathIndex < path.length - 1) {
-            enemy.pathIndex += enemy.speed;
-            const i = Math.floor(enemy.pathIndex);
-            const t = enemy.pathIndex - i;
-            const p0 = path[i];
-            const p1 = path[i + 1] || p0;
+            let nextIndex = enemy.pathIndex + enemy.speed;
+            if (i > 0) {
+                const prev = enemies[i - 1];
+                const maxIndex = prev.pathIndex - ENEMY_SPACING;
+                if (nextIndex > maxIndex) nextIndex = Math.max(enemy.pathIndex, maxIndex);
+            }
+            enemy.pathIndex = Math.min(nextIndex, path.length - 1);
+            const idx = Math.floor(enemy.pathIndex);
+            const t = enemy.pathIndex - idx;
+            const p0 = path[idx];
+            const p1 = path[idx + 1] || p0;
             enemy.x = p0.x + (p1.x - p0.x) * t;
             enemy.y = p0.y + (p1.y - p0.y) * t;
         } else {
@@ -141,8 +150,15 @@ function update() {
         bullet.y += dy / dist * 0.2;
         if (dist < 0.2) {
             bullet.target.hp--;
+            damageTexts.push({x: bullet.target.x, y: bullet.target.y, value: 1, life: 30});
             bullet.dead = true;
         }
+    }
+
+    // update floating damage numbers
+    for (const text of damageTexts) {
+        text.y -= 0.02;
+        text.life--;
     }
 
     // remove dead bullets and enemies
@@ -158,6 +174,9 @@ function update() {
     }
     for (let i = bullets.length - 1; i >= 0; i--) {
         if (bullets[i].dead) bullets.splice(i, 1);
+    }
+    for (let i = damageTexts.length - 1; i >= 0; i--) {
+        if (damageTexts[i].life <= 0) damageTexts.splice(i, 1);
     }
 
     if (!spawning && waveRemaining === 0 && enemies.length === 0) {
@@ -212,6 +231,19 @@ function draw() {
             size
         );
     }
+
+    // draw floating damage numbers
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px sans-serif';
+    for (const text of damageTexts) {
+        ctx.globalAlpha = text.life / 30;
+        ctx.fillText(
+            text.value,
+            text.x * TILE_SIZE + TILE_SIZE / 2,
+            text.y * TILE_SIZE
+        );
+    }
+    ctx.globalAlpha = 1;
 
     // draw bullets
     ctx.fillStyle = '#ff0';
