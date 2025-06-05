@@ -67,32 +67,54 @@ function isBuildable(x, y) {
     return true;
 }
 
+let nextSpawn = 0;
+
 function startWave() {
     wave++;
     waveRemaining = 5 + wave * 2;
     spawning = true;
+    nextSpawn = tick; // spawn immediately
     startBtn.disabled = true;
 }
 
 function spawnEnemy() {
-    enemies.push({pathIndex: 0, hp: 3, x: path[0].x, y: path[0].y});
+    const types = [
+        { size: 0.6, color: '#0ff', hp: 2, speed: 0.025 },
+        { size: 1.0, color: '#f00', hp: 3, speed: 0.02 },
+        { size: 1.4, color: '#ff0', hp: 6, speed: 0.015 }
+    ];
+    const type = types[Math.floor(Math.random() * types.length)];
+    enemies.push({
+        pathIndex: 0,
+        hp: type.hp,
+        maxHp: type.hp,
+        x: path[0].x,
+        y: path[0].y,
+        size: type.size,
+        color: type.color,
+        speed: type.speed
+    });
 }
 
 function update() {
     tick++;
-    if (spawning && waveRemaining > 0 && tick % 60 === 0) {
+    if (spawning && waveRemaining > 0 && tick >= nextSpawn) {
         spawnEnemy();
         waveRemaining--;
+        nextSpawn = tick + 40 + Math.random() * 20;
         if (waveRemaining === 0) spawning = false;
     }
 
     // move enemies along path
     for (const enemy of enemies) {
         if (enemy.pathIndex < path.length - 1) {
-            enemy.pathIndex += 0.02;
-            const p = path[Math.floor(enemy.pathIndex)];
-            enemy.x = p.x;
-            enemy.y = p.y;
+            enemy.pathIndex += enemy.speed;
+            const i = Math.floor(enemy.pathIndex);
+            const t = enemy.pathIndex - i;
+            const p0 = path[i];
+            const p1 = path[i + 1] || p0;
+            enemy.x = p0.x + (p1.x - p0.x) * t;
+            enemy.y = p0.y + (p1.y - p0.y) * t;
         } else {
             enemy.reached = true;
         }
@@ -180,9 +202,15 @@ function draw() {
     }
 
     // draw enemies
-    ctx.fillStyle = '#f00';
     for (const enemy of enemies) {
-        ctx.fillRect(enemy.x * TILE_SIZE, enemy.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = enemy.color;
+        const size = TILE_SIZE * enemy.size;
+        ctx.fillRect(
+            enemy.x * TILE_SIZE + (TILE_SIZE - size) / 2,
+            enemy.y * TILE_SIZE + (TILE_SIZE - size) / 2,
+            size,
+            size
+        );
     }
 
     // draw bullets
