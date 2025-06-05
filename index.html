@@ -4,11 +4,22 @@
     <meta charset="UTF-8">
     <title>Tower Defense Demo</title>
     <style>
-        body { margin: 0; font-family: sans-serif; }
+        body { margin: 0; font-family: sans-serif; background:#000; color:#fff; }
+        #ui {
+            text-align: center;
+            padding: 4px;
+            background: #222;
+        }
         canvas { background: #111; display: block; margin: auto; }
     </style>
 </head>
 <body>
+    <div id="ui">
+        Gold: <span id="gold"></span>
+        Lives: <span id="lives"></span>
+        Wave: <span id="wave"></span>
+        <button id="startWave">Start Wave</button>
+    </div>
     <canvas id="game" width="640" height="480"></canvas>
     <script src="app.js"></script>
 </body>
