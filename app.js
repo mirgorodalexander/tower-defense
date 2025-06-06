@@ -6,6 +6,8 @@ const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
 const ENEMY_SPACING = 0.6; // minimum distance between enemies along the path
+const SPRITE_GRID = 10; // enemies rendered inside a 10x10 pixel square
+const SPRITE_PIXEL = Math.floor(TILE_SIZE / SPRITE_GRID);
 
 let gold = 100;
 let lives = 20;
@@ -82,38 +84,95 @@ function startWave() {
 function spawnEnemy() {
     const types = [
         {
-            sprite: [
-                "  ^  ",
-                " /_\\ ",
-                "/___\\",
-                " |_| ",
-                "  |  "
+            palette: { g: '#0f0', G: '#070', '.': null },
+            frames: [
+                [
+                    '....gg....',
+                    '...gGGg...',
+                    '..gggggg..',
+                    '.gGGGGGGg.',
+                    '.gggggggg.',
+                    '.gg....gg.',
+                    '.g......g.',
+                    '.gg....gg.',
+                    '..g....g..',
+                    '..gg..gg..'
+                ],
+                [
+                    '....gg....',
+                    '...gGGg...',
+                    '..gggggg..',
+                    '.gGGGGGGg.',
+                    '.gggggggg.',
+                    '.gG....Gg.',
+                    '.gg....gg.',
+                    '..g....g..',
+                    '..gg..gg..',
+                    '..........'
+                ]
             ],
-            color: '#0ff',
             hp: 2,
             speed: 0.025
         },
         {
-            sprite: [
-                "o---o",
-                "|   |",
-                "|   |",
-                "|   |",
-                "o---o"
+            palette: { r: '#f66', R: '#a00', '.': null },
+            frames: [
+                [
+                    '....RR....',
+                    '...RrrR...',
+                    '..rrrrrr..',
+                    '.rRRRRRRr.',
+                    '.rrrrrrrr.',
+                    '.rr....rr.',
+                    '.r......r.',
+                    '.rr....rr.',
+                    '..r....r..',
+                    '..rr..rr..'
+                ],
+                [
+                    '....RR....',
+                    '...RrrR...',
+                    '..rrrrrr..',
+                    '.rRRRRRRr.',
+                    '.rrrrrrrr.',
+                    '.rR....Rr.',
+                    '.rr....rr.',
+                    '..r....r..',
+                    '..rr..rr..',
+                    '..........'
+                ]
             ],
-            color: '#f00',
             hp: 3,
             speed: 0.02
         },
         {
-            sprite: [
-                "xxxxx",
-                "x   x",
-                "x x x",
-                "x   x",
-                "xxxxx"
+            palette: { y: '#ff0', Y: '#aa0', '.': null },
+            frames: [
+                [
+                    '..........',
+                    '..yyyyyy..',
+                    '.yYYYYYYy.',
+                    '.yYYYYYYy.',
+                    '.yyyyyyyy.',
+                    '.yyyyyyyy.',
+                    '.yy....yy.',
+                    '..y....y..',
+                    '..yyyyyy..',
+                    '..........'
+                ],
+                [
+                    '..........',
+                    '..yyyyyy..',
+                    '.yYYYYYYy.',
+                    '.yYYYYYYy.',
+                    '.yyyyyyyy.',
+                    '.yyyyyyyy.',
+                    '..yy..yy..',
+                    '..yyyyyy..',
+                    '..........',
+                    '..........'
+                ]
             ],
-            color: '#ff0',
             hp: 6,
             speed: 0.015
         }
@@ -125,8 +184,9 @@ function spawnEnemy() {
         maxHp: type.hp,
         x: path[0].x,
         y: path[0].y,
-        sprite: type.sprite,
-        color: type.color,
+        frames: type.frames,
+        palette: type.palette,
+        frame: 0,
         speed: type.speed
     });
 }
@@ -160,6 +220,7 @@ function update() {
         } else {
             enemy.reached = true;
         }
+        enemy.frame = (enemy.frame + 0.1) % enemy.frames.length;
     }
 
     // towers shoot
@@ -253,17 +314,24 @@ function draw() {
         ctx.fillRect(tower.x * TILE_SIZE, tower.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
 
-    // draw enemies as ASCII art
+    // draw enemies as pixel sprites
     for (const enemy of enemies) {
-        ctx.fillStyle = enemy.color;
-        const sprite = enemy.sprite;
-        const cellSize = TILE_SIZE / sprite.length;
-        ctx.font = `${cellSize}px monospace`;
-        for (let r = 0; r < sprite.length; r++) {
-            const row = sprite[r];
-            const x = enemy.x * TILE_SIZE + (TILE_SIZE - cellSize * row.length) / 2;
-            const y = enemy.y * TILE_SIZE + (r + 1) * cellSize;
-            ctx.fillText(row, x, y);
+        const frame = enemy.frames[Math.floor(enemy.frame)];
+        const offset = Math.floor((TILE_SIZE - SPRITE_PIXEL * SPRITE_GRID) / 2);
+        for (let y = 0; y < SPRITE_GRID; y++) {
+            const row = frame[y];
+            for (let x = 0; x < SPRITE_GRID; x++) {
+                const code = row[x];
+                const color = enemy.palette[code];
+                if (!color) continue;
+                ctx.fillStyle = color;
+                ctx.fillRect(
+                    enemy.x * TILE_SIZE + offset + x * SPRITE_PIXEL,
+                    enemy.y * TILE_SIZE + offset + y * SPRITE_PIXEL,
+                    SPRITE_PIXEL,
+                    SPRITE_PIXEL
+                );
+            }
         }
     }
 
