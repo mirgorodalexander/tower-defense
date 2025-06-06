@@ -81,9 +81,42 @@ function startWave() {
 
 function spawnEnemy() {
     const types = [
-        { size: 0.6, color: '#0ff', hp: 2, speed: 0.025 },
-        { size: 1.0, color: '#f00', hp: 3, speed: 0.02 },
-        { size: 1.4, color: '#ff0', hp: 6, speed: 0.015 }
+        {
+            sprite: [
+                "  ^  ",
+                " /_\\ ",
+                "/___\\",
+                " |_| ",
+                "  |  "
+            ],
+            color: '#0ff',
+            hp: 2,
+            speed: 0.025
+        },
+        {
+            sprite: [
+                "o---o",
+                "|   |",
+                "|   |",
+                "|   |",
+                "o---o"
+            ],
+            color: '#f00',
+            hp: 3,
+            speed: 0.02
+        },
+        {
+            sprite: [
+                "xxxxx",
+                "x   x",
+                "x x x",
+                "x   x",
+                "xxxxx"
+            ],
+            color: '#ff0',
+            hp: 6,
+            speed: 0.015
+        }
     ];
     const type = types[Math.floor(Math.random() * types.length)];
     enemies.push({
@@ -92,7 +125,7 @@ function spawnEnemy() {
         maxHp: type.hp,
         x: path[0].x,
         y: path[0].y,
-        size: type.size,
+        sprite: type.sprite,
         color: type.color,
         speed: type.speed
     });
@@ -220,16 +253,18 @@ function draw() {
         ctx.fillRect(tower.x * TILE_SIZE, tower.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
 
-    // draw enemies
+    // draw enemies as ASCII art
     for (const enemy of enemies) {
         ctx.fillStyle = enemy.color;
-        const size = TILE_SIZE * enemy.size;
-        ctx.fillRect(
-            enemy.x * TILE_SIZE + (TILE_SIZE - size) / 2,
-            enemy.y * TILE_SIZE + (TILE_SIZE - size) / 2,
-            size,
-            size
-        );
+        const sprite = enemy.sprite;
+        const cellSize = TILE_SIZE / sprite.length;
+        ctx.font = `${cellSize}px monospace`;
+        for (let r = 0; r < sprite.length; r++) {
+            const row = sprite[r];
+            const x = enemy.x * TILE_SIZE + (TILE_SIZE - cellSize * row.length) / 2;
+            const y = enemy.y * TILE_SIZE + (r + 1) * cellSize;
+            ctx.fillText(row, x, y);
+        }
     }
 
     // draw floating damage numbers
