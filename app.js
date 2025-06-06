@@ -6,6 +6,8 @@ const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
 const ENEMY_SPACING = 0.6; // minimum distance between enemies along the path
+const SPRITE_GRID = 10; // enemies rendered inside a 10x10 pixel square
+const SPRITE_PIXEL = Math.floor(TILE_SIZE / SPRITE_GRID);
 
 let gold = 100;
 let lives = 20;
@@ -315,19 +317,19 @@ function draw() {
     // draw enemies as pixel sprites
     for (const enemy of enemies) {
         const frame = enemy.frames[Math.floor(enemy.frame)];
-        const size = TILE_SIZE / frame.length; // 10x10 grid
-        for (let y = 0; y < frame.length; y++) {
+        const offset = Math.floor((TILE_SIZE - SPRITE_PIXEL * SPRITE_GRID) / 2);
+        for (let y = 0; y < SPRITE_GRID; y++) {
             const row = frame[y];
-            for (let x = 0; x < row.length; x++) {
+            for (let x = 0; x < SPRITE_GRID; x++) {
                 const code = row[x];
                 const color = enemy.palette[code];
                 if (!color) continue;
                 ctx.fillStyle = color;
                 ctx.fillRect(
-                    enemy.x * TILE_SIZE + x * size,
-                    enemy.y * TILE_SIZE + y * size,
-                    size,
-                    size
+                    enemy.x * TILE_SIZE + offset + x * SPRITE_PIXEL,
+                    enemy.y * TILE_SIZE + offset + y * SPRITE_PIXEL,
+                    SPRITE_PIXEL,
+                    SPRITE_PIXEL
                 );
             }
         }
