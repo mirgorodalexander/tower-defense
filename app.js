@@ -6,8 +6,8 @@ const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
 const ENEMY_SPACING = 0.6; // minimum distance between enemies along the path
-const SPRITE_GRID = 10; // enemies rendered inside a 10x10 pixel square
-const SPRITE_PIXEL = Math.floor(TILE_SIZE / SPRITE_GRID);
+const SPRITE_GRID = 20; // enemies rendered inside a 20x20 pixel square
+const SPRITE_PIXEL = TILE_SIZE / SPRITE_GRID;
 
 let gold = 100;
 let lives = 20;
@@ -41,6 +41,7 @@ const towers = [];
 const enemies = [];
 const bullets = [];
 const damageTexts = [];
+const particles = [];
 let tick = 0;
 
 const goldEl = document.getElementById('gold');
@@ -87,28 +88,48 @@ function spawnEnemy() {
             palette: { g: '#0f0', G: '#070', '.': null },
             frames: [
                 [
-                    '....gg....',
-                    '...gGGg...',
-                    '..gggggg..',
-                    '.gGGGGGGg.',
-                    '.gggggggg.',
-                    '.gg....gg.',
-                    '.g......g.',
-                    '.gg....gg.',
-                    '..g....g..',
-                    '..gg..gg..'
+                    '....................',
+                    '......gGGGGg........',
+                    '.....ggGGGGgg.......',
+                    '....gggGGGGggg......',
+                    '...gGGggggggGGg.....',
+                    '..gGGgg....ggGGg....',
+                    '.gGGGGg....gGGGGg...',
+                    '.gGGGGg....gGGGGg...',
+                    '.gggggg....gggggg...',
+                    '.gggggg....gggggg...',
+                    '.gggggg....gggggg...',
+                    '.gggggg....gggggg...',
+                    '..gggg......gggg....',
+                    '..gggg......gggg....',
+                    '...gg........gg.....',
+                    '...gg........gg.....',
+                    '....gg......gg......',
+                    '....gg......gg......',
+                    '.....gggggggg.......',
+                    '....................'
                 ],
                 [
-                    '....gg....',
-                    '...gGGg...',
-                    '..gggggg..',
-                    '.gGGGGGGg.',
-                    '.gggggggg.',
-                    '.gG....Gg.',
-                    '.gg....gg.',
-                    '..g....g..',
-                    '..gg..gg..',
-                    '..........'
+                    '....................',
+                    '......gGGGGg........',
+                    '.....ggGGGGgg.......',
+                    '....gggGGGGggg......',
+                    '...gGGggggggGGg.....',
+                    '..gGGgg....ggGGg....',
+                    '.gGGGGg....gGGGGg...',
+                    '.gGGGGg....gGGGGg...',
+                    '.gggggg....gggggg...',
+                    '.gggggg....gggggg...',
+                    '..ggggg....ggggg....',
+                    '..ggggg....ggggg....',
+                    '..gggg......gggg....',
+                    '..gggg......gggg....',
+                    '...gg........gg.....',
+                    '...gg........gg.....',
+                    '....gg......gg......',
+                    '....gg......gg......',
+                    '.....gggggggg.......',
+                    '....................'
                 ]
             ],
             hp: 2,
@@ -118,28 +139,48 @@ function spawnEnemy() {
             palette: { r: '#f66', R: '#a00', '.': null },
             frames: [
                 [
-                    '....RR....',
-                    '...RrrR...',
-                    '..rrrrrr..',
-                    '.rRRRRRRr.',
-                    '.rrrrrrrr.',
-                    '.rr....rr.',
-                    '.r......r.',
-                    '.rr....rr.',
-                    '..r....r..',
-                    '..rr..rr..'
+                    '....................',
+                    '......RRRRR.........',
+                    '.....RRrrrrR........',
+                    '....RrrrrrrrR.......',
+                    '...RrrRRRRrrR.......',
+                    '..RrrRR..RRrrR......',
+                    '.RrrrR....RrrrrR....',
+                    '.RrrrR....RrrrrR....',
+                    '.Rrrrr....rrrrrR....',
+                    '.Rrrrr....rrrrrR....',
+                    '.rrrrr....rrrrrR....',
+                    '.rrrrr....rrrrrR....',
+                    '.rrrr......rrrr.....',
+                    '.rrrr......rrrr.....',
+                    '..rr........rr......',
+                    '..rr........rr......',
+                    '...rr......rr.......',
+                    '...rr......rr.......',
+                    '....rrrrrrrr........',
+                    '....................'
                 ],
                 [
-                    '....RR....',
-                    '...RrrR...',
-                    '..rrrrrr..',
-                    '.rRRRRRRr.',
-                    '.rrrrrrrr.',
-                    '.rR....Rr.',
-                    '.rr....rr.',
-                    '..r....r..',
-                    '..rr..rr..',
-                    '..........'
+                    '....................',
+                    '......RRRRR.........',
+                    '.....RRrrrrR........',
+                    '....RrrrrrrrR.......',
+                    '...RrrRRRRrrR.......',
+                    '..RrrRR..RRrrR......',
+                    '.RrrrR....RrrrrR....',
+                    '.RrrrR....RrrrrR....',
+                    '.Rrrrr....rrrrrR....',
+                    '.Rrrrr....rrrrrR....',
+                    '.rrrrr....rrrrrR....',
+                    '.rrrrr....rrrrrR....',
+                    '.rrrr......rrrr.....',
+                    '.rrrr......rrrr.....',
+                    '..rr........rr......',
+                    '..rr........rr......',
+                    '...rr......rr.......',
+                    '...rr......rr.......',
+                    '....rrrrrrrr........',
+                    '....................'
                 ]
             ],
             hp: 3,
@@ -149,28 +190,48 @@ function spawnEnemy() {
             palette: { y: '#ff0', Y: '#aa0', '.': null },
             frames: [
                 [
-                    '..........',
-                    '..yyyyyy..',
-                    '.yYYYYYYy.',
-                    '.yYYYYYYy.',
-                    '.yyyyyyyy.',
-                    '.yyyyyyyy.',
-                    '.yy....yy.',
-                    '..y....y..',
-                    '..yyyyyy..',
-                    '..........'
+                    '....................',
+                    '......yyyyyy........',
+                    '.....yYYYYYYy.......',
+                    '....yYYYYYYYYy......',
+                    '...yYYYYYYYYYYy.....',
+                    '..yYYYYYY..YYYYy....',
+                    '.yYYYYYY....YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    '.yYYYY......YYYYYy..',
+                    '.yYYYY......YYYYYy..',
+                    '..yyyy......yyyyy...',
+                    '..yyyy......yyyyy...',
+                    '...yy........yy.....',
+                    '...yy........yy.....',
+                    '....yy......yy......',
+                    '....yy......yy......',
+                    '.....yyyyyyyy.......',
+                    '....................'
                 ],
                 [
-                    '..........',
-                    '..yyyyyy..',
-                    '.yYYYYYYy.',
-                    '.yYYYYYYy.',
-                    '.yyyyyyyy.',
-                    '.yyyyyyyy.',
-                    '..yy..yy..',
-                    '..yyyyyy..',
-                    '..........',
-                    '..........'
+                    '....................',
+                    '......yyyyyy........',
+                    '.....yYYYYYYy.......',
+                    '....yYYYYYYYYy......',
+                    '...yYYYYYYYYYYy.....',
+                    '..yYYYYYY..YYYYy....',
+                    '.yYYYYYY....YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    'yYYYYY......YYYYYy..',
+                    '.yYYYY......YYYYYy..',
+                    '.yYYYY......YYYYYy..',
+                    '..yyyyy....yyyyy....',
+                    '..yyyyy....yyyyy....',
+                    '...yy........yy.....',
+                    '...yy........yy.....',
+                    '....yy......yy......',
+                    '....yy......yy......',
+                    '.....yyyyyyyy.......',
+                    '....................'
                 ]
             ],
             hp: 6,
@@ -189,6 +250,20 @@ function spawnEnemy() {
         frame: 0,
         speed: type.speed
     });
+}
+
+function spawnExplosion(enemy) {
+    const colors = Object.values(enemy.palette).filter(c => c);
+    for (let i = 0; i < 30; i++) {
+        particles.push({
+            x: enemy.x + 0.5,
+            y: enemy.y + 0.5,
+            vx: (Math.random() - 0.5) * 0.2,
+            vy: (Math.random() - 0.5) * 0.2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            life: 30
+        });
+    }
 }
 
 function update() {
@@ -255,10 +330,19 @@ function update() {
         text.life--;
     }
 
+    // update particles
+    for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.01;
+        p.life--;
+    }
+
     // remove dead bullets and enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         if (e.hp <= 0) {
+            spawnExplosion(e);
             enemies.splice(i, 1);
             gold += 5;
         } else if (e.reached) {
@@ -271,6 +355,9 @@ function update() {
     }
     for (let i = damageTexts.length - 1; i >= 0; i--) {
         if (damageTexts[i].life <= 0) damageTexts.splice(i, 1);
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+        if (particles[i].life <= 0) particles.splice(i, 1);
     }
 
     if (!spawning && waveRemaining === 0 && enemies.length === 0) {
@@ -334,6 +421,19 @@ function draw() {
             }
         }
     }
+
+    // draw explosion particles
+    for (const p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(p.life / 30, 0);
+        ctx.fillRect(
+            p.x * TILE_SIZE,
+            p.y * TILE_SIZE,
+            SPRITE_PIXEL,
+            SPRITE_PIXEL
+        );
+    }
+    ctx.globalAlpha = 1;
 
     // draw floating damage numbers
     ctx.fillStyle = '#fff';
