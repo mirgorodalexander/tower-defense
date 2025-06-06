@@ -18,7 +18,23 @@
         Gold: <span id="gold"></span>
         Lives: <span id="lives"></span>
         Wave: <span id="wave"></span>
+        <span id="countdown"></span>
         <button id="startWave">Start Wave</button>
+        <select id="towerType">
+            <option value="crossbow">🏹</option>
+            <option value="tank">🚓</option>
+            <option value="mortar">💣</option>
+        </select>
+        <button id="pauseBtn">Pause</button>
+        <button id="saveBtn">Save</button>
+        <button id="loadBtn">Load</button>
+    </div>
+    <div id="upgradeMenu" style="display:none;background:#333;padding:4px;text-align:center;">
+        <div>Upgrade Tower</div>
+        <button data-up="damage">Damage</button>
+        <button data-up="speed">Speed</button>
+        <button data-up="range">Range</button>
+        <button id="closeUpgrade">Close</button>
     </div>
     <canvas id="game" width="640" height="480"></canvas>
     <script src="app.js"></script>

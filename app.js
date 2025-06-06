@@ -1,470 +1,347 @@
-// Simple Tower Defense Demo
+// Emoji Tower Defense
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const TILE_SIZE = 32;
 const MAP_WIDTH = canvas.width / TILE_SIZE;
 const MAP_HEIGHT = canvas.height / TILE_SIZE;
-const ENEMY_SPACING = 0.6; // minimum distance between enemies along the path
-const SPRITE_GRID = 20; // enemies rendered inside a 20x20 pixel square
-const SPRITE_PIXEL = TILE_SIZE / SPRITE_GRID;
 
 let gold = 100;
 let lives = 20;
 let wave = 0;
 let spawning = false;
 let waveRemaining = 0;
+let nextSpawn = 0;
+let tick = 0;
+let paused = false;
+let nextWaveTick = null;
 
-// predefined zigzag path
+const towers = [];
+const enemies = [];
+const bullets = [];
+const coins = [];
+
+let hoverCell = null;
+let selectedTower = null;
+
 const path = [];
 function addLine(x0, y0, x1, y1) {
-    const dx = Math.sign(x1 - x0);
-    const dy = Math.sign(y1 - y0);
-    let x = x0, y = y0;
+  const dx = Math.sign(x1 - x0);
+  const dy = Math.sign(y1 - y0);
+  let x = x0, y = y0;
+  path.push({x, y});
+  while (x !== x1 || y !== y1) {
+    if (x !== x1) x += dx;
+    if (y !== y1) y += dy;
     path.push({x, y});
-    while (x !== x1 || y !== y1) {
-        if (x !== x1) x += dx;
-        if (y !== y1) y += dy;
-        path.push({x, y});
-    }
+  }
 }
-
 addLine(0, Math.floor(MAP_HEIGHT / 2), 5, Math.floor(MAP_HEIGHT / 2));
 addLine(5, Math.floor(MAP_HEIGHT / 2), 5, MAP_HEIGHT - 3);
 addLine(5, MAP_HEIGHT - 3, 15, MAP_HEIGHT - 3);
 addLine(15, MAP_HEIGHT - 3, 15, 4);
 addLine(15, 4, MAP_WIDTH - 1, 4);
 
-// placed towers
-const towers = [];
+const TOWER_TYPES = {
+  crossbow: {emoji:'🏹', damage:1, rate:30, range:3, cost:25},
+  tank: {emoji:'🚓', damage:2, rate:45, range:2.5, cost:40},
+  mortar: {emoji:'💣', damage:3, rate:60, range:4, cost:60}
+};
 
-const enemies = [];
-const bullets = [];
-const damageTexts = [];
-const particles = [];
-let tick = 0;
+const ENEMY_TYPES = [
+  {emoji:'😀', hp:3, speed:0.03},
+  {emoji:'😈', hp:5, speed:0.025},
+  {emoji:'👻', hp:8, speed:0.02}
+];
+const BOSS_EMOJI = '👹';
 
 const goldEl = document.getElementById('gold');
 const livesEl = document.getElementById('lives');
 const waveEl = document.getElementById('wave');
-const startBtn = document.getElementById('startWave');
+const countdownEl = document.getElementById('countdown');
+const towerSelect = document.getElementById('towerType');
+const pauseBtn = document.getElementById('pauseBtn');
+const saveBtn = document.getElementById('saveBtn');
+const loadBtn = document.getElementById('loadBtn');
+const upgradeMenu = document.getElementById('upgradeMenu');
+const closeUpgrade = document.getElementById('closeUpgrade');
 
-startBtn.addEventListener('click', () => {
-    if (!spawning && enemies.length === 0) startWave();
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+});
+
+saveBtn.addEventListener('click', () => {
+  localStorage.setItem('tdSave', JSON.stringify({gold,lives,wave,towers}));
+});
+
+loadBtn.addEventListener('click', () => {
+  const data = localStorage.getItem('tdSave');
+  if (data) {
+    const s = JSON.parse(data);
+    gold = s.gold;
+    lives = s.lives;
+    wave = s.wave;
+    towers.length = 0;
+    for (const t of s.towers) towers.push(t);
+  }
+});
+
+closeUpgrade.addEventListener('click', () => {
+  upgradeMenu.style.display = 'none';
+  selectedTower = null;
+});
+
+upgradeMenu.addEventListener('click', e => {
+  const type = e.target.dataset.up;
+  if (!type || !selectedTower) return;
+  const cost = 20 * selectedTower.level;
+  if (gold < cost) return;
+  gold -= cost;
+  if (type === 'damage') selectedTower.damage++;
+  if (type === 'speed') selectedTower.rate = Math.max(5, selectedTower.rate - 5);
+  if (type === 'range') selectedTower.range += 0.5;
+  selectedTower.level++;
+});
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+  const gy = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+  hoverCell = {x: gx, y: gy};
 });
 
 canvas.addEventListener('click', e => {
-    const rect = canvas.getBoundingClientRect();
-    const gx = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const gy = Math.floor((e.clientY - rect.top) / TILE_SIZE);
-    if (!isBuildable(gx, gy)) return;
-    const cost = 25;
-    if (gold >= cost) {
-        gold -= cost;
-        towers.push({x: gx, y: gy, cooldown: 0});
-    }
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+  const gy = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+  const tower = towers.find(t => t.x === gx && t.y === gy);
+  if (tower) {
+    selectedTower = tower;
+    upgradeMenu.style.display = 'block';
+    return;
+  }
+  if (!isBuildable(gx, gy)) return;
+  const type = TOWER_TYPES[towerSelect.value];
+  if (gold >= type.cost) {
+    gold -= type.cost;
+    towers.push({
+      type: towerSelect.value,
+      x: gx,
+      y: gy,
+      cooldown: 0,
+      damage: type.damage,
+      rate: type.rate,
+      range: type.range,
+      level: 1
+    });
+  }
+});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+  const gy = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+  const tower = towers.find(t => t.x === gx && t.y === gy);
+  if (tower) {
+    selectedTower = tower;
+    upgradeMenu.style.display = 'block';
+  }
 });
 
 function isBuildable(x, y) {
-    if (path.find(p => p.x === x && p.y === y)) return false;
-    if (towers.find(t => t.x === x && t.y === y)) return false;
-    if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return false;
-    return true;
+  if (path.find(p => p.x === x && p.y === y)) return false;
+  if (towers.find(t => t.x === x && t.y === y)) return false;
+  if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return false;
+  return true;
 }
 
-let nextSpawn = 0;
+function scheduleWave() {
+  nextWaveTick = tick + 600; // ~10 seconds
+  countdownEl.textContent = 'Next wave in 10';
+}
 
 function startWave() {
-    wave++;
-    waveRemaining = 5 + wave * 2;
-    spawning = true;
-    nextSpawn = tick; // spawn immediately
-    startBtn.disabled = true;
+  wave++;
+  waveRemaining = 5 + wave * 2;
+  if (wave % 10 === 0) waveRemaining++; // boss
+  spawning = true;
+  nextSpawn = tick;
+  nextWaveTick = null;
 }
 
 function spawnEnemy() {
-    const types = [
-        {
-            palette: { g: '#0f0', G: '#070', '.': null },
-            frames: [
-                [
-                    '....................',
-                    '......gGGGGg........',
-                    '.....ggGGGGgg.......',
-                    '....gggGGGGggg......',
-                    '...gGGggggggGGg.....',
-                    '..gGGgg....ggGGg....',
-                    '.gGGGGg....gGGGGg...',
-                    '.gGGGGg....gGGGGg...',
-                    '.gggggg....gggggg...',
-                    '.gggggg....gggggg...',
-                    '.gggggg....gggggg...',
-                    '.gggggg....gggggg...',
-                    '..gggg......gggg....',
-                    '..gggg......gggg....',
-                    '...gg........gg.....',
-                    '...gg........gg.....',
-                    '....gg......gg......',
-                    '....gg......gg......',
-                    '.....gggggggg.......',
-                    '....................'
-                ],
-                [
-                    '....................',
-                    '......gGGGGg........',
-                    '.....ggGGGGgg.......',
-                    '....gggGGGGggg......',
-                    '...gGGggggggGGg.....',
-                    '..gGGgg....ggGGg....',
-                    '.gGGGGg....gGGGGg...',
-                    '.gGGGGg....gGGGGg...',
-                    '.gggggg....gggggg...',
-                    '.gggggg....gggggg...',
-                    '..ggggg....ggggg....',
-                    '..ggggg....ggggg....',
-                    '..gggg......gggg....',
-                    '..gggg......gggg....',
-                    '...gg........gg.....',
-                    '...gg........gg.....',
-                    '....gg......gg......',
-                    '....gg......gg......',
-                    '.....gggggggg.......',
-                    '....................'
-                ]
-            ],
-            hp: 2,
-            speed: 0.025
-        },
-        {
-            palette: { r: '#f66', R: '#a00', '.': null },
-            frames: [
-                [
-                    '....................',
-                    '......RRRRR.........',
-                    '.....RRrrrrR........',
-                    '....RrrrrrrrR.......',
-                    '...RrrRRRRrrR.......',
-                    '..RrrRR..RRrrR......',
-                    '.RrrrR....RrrrrR....',
-                    '.RrrrR....RrrrrR....',
-                    '.Rrrrr....rrrrrR....',
-                    '.Rrrrr....rrrrrR....',
-                    '.rrrrr....rrrrrR....',
-                    '.rrrrr....rrrrrR....',
-                    '.rrrr......rrrr.....',
-                    '.rrrr......rrrr.....',
-                    '..rr........rr......',
-                    '..rr........rr......',
-                    '...rr......rr.......',
-                    '...rr......rr.......',
-                    '....rrrrrrrr........',
-                    '....................'
-                ],
-                [
-                    '....................',
-                    '......RRRRR.........',
-                    '.....RRrrrrR........',
-                    '....RrrrrrrrR.......',
-                    '...RrrRRRRrrR.......',
-                    '..RrrRR..RRrrR......',
-                    '.RrrrR....RrrrrR....',
-                    '.RrrrR....RrrrrR....',
-                    '.Rrrrr....rrrrrR....',
-                    '.Rrrrr....rrrrrR....',
-                    '.rrrrr....rrrrrR....',
-                    '.rrrrr....rrrrrR....',
-                    '.rrrr......rrrr.....',
-                    '.rrrr......rrrr.....',
-                    '..rr........rr......',
-                    '..rr........rr......',
-                    '...rr......rr.......',
-                    '...rr......rr.......',
-                    '....rrrrrrrr........',
-                    '....................'
-                ]
-            ],
-            hp: 3,
-            speed: 0.02
-        },
-        {
-            palette: { y: '#ff0', Y: '#aa0', '.': null },
-            frames: [
-                [
-                    '....................',
-                    '......yyyyyy........',
-                    '.....yYYYYYYy.......',
-                    '....yYYYYYYYYy......',
-                    '...yYYYYYYYYYYy.....',
-                    '..yYYYYYY..YYYYy....',
-                    '.yYYYYYY....YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    '.yYYYY......YYYYYy..',
-                    '.yYYYY......YYYYYy..',
-                    '..yyyy......yyyyy...',
-                    '..yyyy......yyyyy...',
-                    '...yy........yy.....',
-                    '...yy........yy.....',
-                    '....yy......yy......',
-                    '....yy......yy......',
-                    '.....yyyyyyyy.......',
-                    '....................'
-                ],
-                [
-                    '....................',
-                    '......yyyyyy........',
-                    '.....yYYYYYYy.......',
-                    '....yYYYYYYYYy......',
-                    '...yYYYYYYYYYYy.....',
-                    '..yYYYYYY..YYYYy....',
-                    '.yYYYYYY....YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    'yYYYYY......YYYYYy..',
-                    '.yYYYY......YYYYYy..',
-                    '.yYYYY......YYYYYy..',
-                    '..yyyyy....yyyyy....',
-                    '..yyyyy....yyyyy....',
-                    '...yy........yy.....',
-                    '...yy........yy.....',
-                    '....yy......yy......',
-                    '....yy......yy......',
-                    '.....yyyyyyyy.......',
-                    '....................'
-                ]
-            ],
-            hp: 6,
-            speed: 0.015
-        }
-    ];
-    const type = types[Math.floor(Math.random() * types.length)];
-    enemies.push({
-        pathIndex: 0,
-        hp: type.hp,
-        maxHp: type.hp,
-        x: path[0].x,
-        y: path[0].y,
-        frames: type.frames,
-        palette: type.palette,
-        frame: 0,
-        speed: type.speed
-    });
+  let type;
+  if (wave % 10 === 0 && waveRemaining === 1) {
+    type = {emoji:BOSS_EMOJI, hp: 20 + wave * 2, speed:0.015};
+  } else {
+    type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+  }
+  enemies.push({
+    pathIndex: 0,
+    hp: type.hp,
+    maxHp: type.hp,
+    x: path[0].x,
+    y: path[0].y,
+    emoji: type.emoji,
+    speed: type.speed
+  });
 }
 
-function spawnExplosion(enemy) {
-    const colors = Object.values(enemy.palette).filter(c => c);
-    for (let i = 0; i < 30; i++) {
-        particles.push({
-            x: enemy.x + 0.5,
-            y: enemy.y + 0.5,
-            vx: (Math.random() - 0.5) * 0.2,
-            vy: (Math.random() - 0.5) * 0.2,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            life: 30
-        });
-    }
+function spawnCoin(x, y, amount) {
+  coins.push({x:x*TILE_SIZE, y:y*TILE_SIZE, amount, life:30});
 }
 
 function update() {
-    tick++;
-    if (spawning && waveRemaining > 0 && tick >= nextSpawn) {
-        spawnEnemy();
-        waveRemaining--;
-        nextSpawn = tick + 40 + Math.random() * 20;
-        if (waveRemaining === 0) spawning = false;
+  if (paused) return;
+  tick++;
+  if (nextWaveTick) {
+    const remain = Math.ceil((nextWaveTick - tick)/60);
+    countdownEl.textContent = 'Next wave in ' + remain;
+    if (remain <= 0) {
+      countdownEl.textContent = '';
+      startWave();
     }
+  }
+  if (spawning && waveRemaining > 0 && tick >= nextSpawn) {
+    spawnEnemy();
+    waveRemaining--;
+    nextSpawn = tick + 40;
+    if (waveRemaining === 0) spawning = false;
+  }
 
-    // move enemies along path and keep spacing
-    for (let i = 0; i < enemies.length; i++) {
-        const enemy = enemies[i];
-        if (enemy.pathIndex < path.length - 1) {
-            let nextIndex = enemy.pathIndex + enemy.speed;
-            if (i > 0) {
-                const prev = enemies[i - 1];
-                const maxIndex = prev.pathIndex - ENEMY_SPACING;
-                if (nextIndex > maxIndex) nextIndex = Math.max(enemy.pathIndex, maxIndex);
-            }
-            enemy.pathIndex = Math.min(nextIndex, path.length - 1);
-            const idx = Math.floor(enemy.pathIndex);
-            const t = enemy.pathIndex - idx;
-            const p0 = path[idx];
-            const p1 = path[idx + 1] || p0;
-            enemy.x = p0.x + (p1.x - p0.x) * t;
-            enemy.y = p0.y + (p1.y - p0.y) * t;
-        } else {
-            enemy.reached = true;
-        }
-        enemy.frame = (enemy.frame + 0.1) % enemy.frames.length;
-    }
+  for (let i=0;i<enemies.length;i++){
+    const enemy=enemies[i];
+    if (enemy.pathIndex < path.length - 1) {
+      enemy.pathIndex += enemy.speed;
+      const idx = Math.floor(enemy.pathIndex);
+      const t = enemy.pathIndex - idx;
+      const p0 = path[idx];
+      const p1 = path[idx+1]||p0;
+      enemy.x = p0.x + (p1.x-p0.x)*t;
+      enemy.y = p0.y + (p1.y-p0.y)*t;
+    } else enemy.reached=true;
+  }
 
-    // towers shoot
-    for (const tower of towers) {
-        if (tower.cooldown > 0) tower.cooldown--;
-        else {
-            const target = enemies.find(e => Math.hypot(e.x - tower.x, e.y - tower.y) <= 3);
-            if (target) {
-                bullets.push({x: tower.x, y: tower.y, target});
-                tower.cooldown = 30;
-            }
-        }
+  for (const tower of towers){
+    if (tower.cooldown>0) tower.cooldown--; else {
+      const target = enemies.find(e=>Math.hypot(e.x-tower.x,e.y-tower.y)<=tower.range);
+      if (target){
+        bullets.push({x:tower.x,y:tower.y,target,emoji:'🔸'});
+        tower.cooldown=tower.rate;
+      }
     }
+  }
 
-    // move bullets
-    for (const bullet of bullets) {
-        const dx = bullet.target.x - bullet.x;
-        const dy = bullet.target.y - bullet.y;
-        const dist = Math.hypot(dx, dy);
-        bullet.x += dx / dist * 0.2;
-        bullet.y += dy / dist * 0.2;
-        if (dist < 0.2) {
-            bullet.target.hp--;
-            damageTexts.push({x: bullet.target.x, y: bullet.target.y, value: 1, life: 30});
-            bullet.dead = true;
-        }
+  for (const bullet of bullets){
+    const dx=bullet.target.x - bullet.x;
+    const dy=bullet.target.y - bullet.y;
+    const dist=Math.hypot(dx,dy);
+    bullet.x += dx/dist*0.2;
+    bullet.y += dy/dist*0.2;
+    if (dist<0.2){
+      bullet.target.hp -= bullet.target.hp>0?1:0;
+      spawnCoin(bullet.target.x, bullet.target.y, 1);
+      bullet.dead=true;
     }
+  }
 
-    // update floating damage numbers
-    for (const text of damageTexts) {
-        text.y -= 0.02;
-        text.life--;
+  for (let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    if (e.hp<=0){
+      spawnCoin(e.x,e.y,5);
+      enemies.splice(i,1);
+    } else if (e.reached){
+      lives--;
+      enemies.splice(i,1);
     }
+  }
+  for (let i=bullets.length-1;i>=0;i--) if (bullets[i].dead) bullets.splice(i,1);
 
-    // update particles
-    for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.01;
-        p.life--;
+  for (const c of coins){
+    const goldRect=goldEl.getBoundingClientRect();
+    const canvasRect=canvas.getBoundingClientRect();
+    const tx=goldRect.left-canvasRect.left;
+    const ty=goldRect.top-canvasRect.top;
+    c.x += (tx - c.x)/10;
+    c.y += (ty - c.y)/10;
+    c.life--;
+    if (c.life<=0){
+      gold += c.amount;
+      coins.splice(coins.indexOf(c),1);
     }
+  }
 
-    // remove dead bullets and enemies
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-        if (e.hp <= 0) {
-            spawnExplosion(e);
-            enemies.splice(i, 1);
-            gold += 5;
-        } else if (e.reached) {
-            lives--;
-            enemies.splice(i, 1);
-        }
-    }
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        if (bullets[i].dead) bullets.splice(i, 1);
-    }
-    for (let i = damageTexts.length - 1; i >= 0; i--) {
-        if (damageTexts[i].life <= 0) damageTexts.splice(i, 1);
-    }
-    for (let i = particles.length - 1; i >= 0; i--) {
-        if (particles[i].life <= 0) particles.splice(i, 1);
-    }
+  if (!spawning && waveRemaining === 0 && enemies.length === 0 && !nextWaveTick && wave < 50) {
+    scheduleWave();
+  }
 
-    if (!spawning && waveRemaining === 0 && enemies.length === 0) {
-        startBtn.disabled = false;
-    }
-
-    goldEl.textContent = gold;
-    livesEl.textContent = lives;
-    waveEl.textContent = wave;
+  goldEl.textContent = gold;
+  livesEl.textContent = lives;
+  waveEl.textContent = wave;
 }
 
-function drawGrid() {
-    ctx.strokeStyle = '#333';
-    for (let x = 0; x <= MAP_WIDTH; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * TILE_SIZE, 0);
-        ctx.lineTo(x * TILE_SIZE, canvas.height);
-        ctx.stroke();
-    }
-    for (let y = 0; y <= MAP_HEIGHT; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * TILE_SIZE);
-        ctx.lineTo(canvas.width, y * TILE_SIZE);
-        ctx.stroke();
-    }
+function drawGrid(){
+  ctx.strokeStyle = '#333';
+  for (let x=0;x<=MAP_WIDTH;x++){
+    ctx.beginPath();
+    ctx.moveTo(x*TILE_SIZE,0);
+    ctx.lineTo(x*TILE_SIZE,canvas.height);
+    ctx.stroke();
+  }
+  for (let y=0;y<=MAP_HEIGHT;y++){
+    ctx.beginPath();
+    ctx.moveTo(0,y*TILE_SIZE);
+    ctx.lineTo(canvas.width,y*TILE_SIZE);
+    ctx.stroke();
+  }
 }
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGrid();
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawGrid();
 
-    // draw path
-    ctx.fillStyle = '#444';
-    for (const cell of path) {
-        ctx.fillRect(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    }
+  ctx.fillStyle='#444';
+  for (const cell of path){
+    ctx.fillRect(cell.x*TILE_SIZE, cell.y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
 
-    // draw towers
-    ctx.fillStyle = '#0f0';
-    for (const tower of towers) {
-        ctx.fillRect(tower.x * TILE_SIZE, tower.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    }
+  for (const tower of towers){
+    ctx.font='24px serif';
+    ctx.fillText(TOWER_TYPES[tower.type].emoji, tower.x*TILE_SIZE+8, tower.y*TILE_SIZE+24);
+  }
 
-    // draw enemies as pixel sprites
-    for (const enemy of enemies) {
-        const frame = enemy.frames[Math.floor(enemy.frame)];
-        const offset = Math.floor((TILE_SIZE - SPRITE_PIXEL * SPRITE_GRID) / 2);
-        for (let y = 0; y < SPRITE_GRID; y++) {
-            const row = frame[y];
-            for (let x = 0; x < SPRITE_GRID; x++) {
-                const code = row[x];
-                const color = enemy.palette[code];
-                if (!color) continue;
-                ctx.fillStyle = color;
-                ctx.fillRect(
-                    enemy.x * TILE_SIZE + offset + x * SPRITE_PIXEL,
-                    enemy.y * TILE_SIZE + offset + y * SPRITE_PIXEL,
-                    SPRITE_PIXEL,
-                    SPRITE_PIXEL
-                );
-            }
-        }
-    }
+  if (hoverCell && isBuildable(hoverCell.x, hoverCell.y)){
+    ctx.strokeStyle='rgba(0,255,0,0.5)';
+    const r=TOWER_TYPES[towerSelect.value].range*TILE_SIZE;
+    ctx.beginPath();
+    ctx.arc(hoverCell.x*TILE_SIZE+TILE_SIZE/2, hoverCell.y*TILE_SIZE+TILE_SIZE/2, r, 0, Math.PI*2);
+    ctx.stroke();
+  }
 
-    // draw explosion particles
-    for (const p of particles) {
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(p.life / 30, 0);
-        ctx.fillRect(
-            p.x * TILE_SIZE,
-            p.y * TILE_SIZE,
-            SPRITE_PIXEL,
-            SPRITE_PIXEL
-        );
-    }
-    ctx.globalAlpha = 1;
+  for (const enemy of enemies){
+    let emoji=enemy.emoji;
+    if (enemy.hp/enemy.maxHp<0.5) emoji='😞';
+    if (enemy.hp/enemy.maxHp<0.2) emoji='😵';
+    ctx.font='24px serif';
+    ctx.fillText(emoji, enemy.x*TILE_SIZE+8, enemy.y*TILE_SIZE+24);
+  }
 
-    // draw floating damage numbers
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px sans-serif';
-    for (const text of damageTexts) {
-        ctx.globalAlpha = text.life / 30;
-        ctx.fillText(
-            text.value,
-            text.x * TILE_SIZE + TILE_SIZE / 2,
-            text.y * TILE_SIZE
-        );
-    }
-    ctx.globalAlpha = 1;
+  for (const b of bullets){
+    ctx.fillText(b.emoji, b.x*TILE_SIZE+8, b.y*TILE_SIZE+24);
+  }
 
-    // draw bullets
-    ctx.fillStyle = '#ff0';
-    for (const bullet of bullets) {
-        ctx.beginPath();
-        ctx.arc(bullet.x * TILE_SIZE + TILE_SIZE / 2, bullet.y * TILE_SIZE + TILE_SIZE / 2, 4, 0, Math.PI * 2);
-        ctx.fill();
-    }
+  for (const c of coins){
+    ctx.fillText('🪙', c.x, c.y);
+  }
 }
 
-function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
 }
 
-goldEl.textContent = gold;
-livesEl.textContent = lives;
-waveEl.textContent = wave;
-
+scheduleWave();
 loop();

@@ -1,6 +1,6 @@
 # Tower Defense
 
-This repository contains a very small tower defense demo written in vanilla JavaScript. Open `index.html` in a modern browser to play.
+This repository contains a very small emoji based tower defense demo written in vanilla JavaScript. Open `index.html` in a modern browser to play.
 
 ## How to run
 
