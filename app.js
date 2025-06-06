@@ -81,9 +81,99 @@ function startWave() {
 
 function spawnEnemy() {
     const types = [
-        { size: 0.6, color: '#0ff', hp: 2, speed: 0.025 },
-        { size: 1.0, color: '#f00', hp: 3, speed: 0.02 },
-        { size: 1.4, color: '#ff0', hp: 6, speed: 0.015 }
+        {
+            palette: { g: '#0f0', G: '#070', '.': null },
+            frames: [
+                [
+                    '....gg....',
+                    '...gGGg...',
+                    '..gggggg..',
+                    '.gGGGGGGg.',
+                    '.gggggggg.',
+                    '.gg....gg.',
+                    '.g......g.',
+                    '.gg....gg.',
+                    '..g....g..',
+                    '..gg..gg..'
+                ],
+                [
+                    '....gg....',
+                    '...gGGg...',
+                    '..gggggg..',
+                    '.gGGGGGGg.',
+                    '.gggggggg.',
+                    '.gG....Gg.',
+                    '.gg....gg.',
+                    '..g....g..',
+                    '..gg..gg..',
+                    '..........'
+                ]
+            ],
+            hp: 2,
+            speed: 0.025
+        },
+        {
+            palette: { r: '#f66', R: '#a00', '.': null },
+            frames: [
+                [
+                    '....RR....',
+                    '...RrrR...',
+                    '..rrrrrr..',
+                    '.rRRRRRRr.',
+                    '.rrrrrrrr.',
+                    '.rr....rr.',
+                    '.r......r.',
+                    '.rr....rr.',
+                    '..r....r..',
+                    '..rr..rr..'
+                ],
+                [
+                    '....RR....',
+                    '...RrrR...',
+                    '..rrrrrr..',
+                    '.rRRRRRRr.',
+                    '.rrrrrrrr.',
+                    '.rR....Rr.',
+                    '.rr....rr.',
+                    '..r....r..',
+                    '..rr..rr..',
+                    '..........'
+                ]
+            ],
+            hp: 3,
+            speed: 0.02
+        },
+        {
+            palette: { y: '#ff0', Y: '#aa0', '.': null },
+            frames: [
+                [
+                    '..........',
+                    '..yyyyyy..',
+                    '.yYYYYYYy.',
+                    '.yYYYYYYy.',
+                    '.yyyyyyyy.',
+                    '.yyyyyyyy.',
+                    '.yy....yy.',
+                    '..y....y..',
+                    '..yyyyyy..',
+                    '..........'
+                ],
+                [
+                    '..........',
+                    '..yyyyyy..',
+                    '.yYYYYYYy.',
+                    '.yYYYYYYy.',
+                    '.yyyyyyyy.',
+                    '.yyyyyyyy.',
+                    '..yy..yy..',
+                    '..yyyyyy..',
+                    '..........',
+                    '..........'
+                ]
+            ],
+            hp: 6,
+            speed: 0.015
+        }
     ];
     const type = types[Math.floor(Math.random() * types.length)];
     enemies.push({
@@ -92,8 +182,9 @@ function spawnEnemy() {
         maxHp: type.hp,
         x: path[0].x,
         y: path[0].y,
-        size: type.size,
-        color: type.color,
+        frames: type.frames,
+        palette: type.palette,
+        frame: 0,
         speed: type.speed
     });
 }
@@ -127,6 +218,7 @@ function update() {
         } else {
             enemy.reached = true;
         }
+        enemy.frame = (enemy.frame + 0.1) % enemy.frames.length;
     }
 
     // towers shoot
@@ -220,16 +312,25 @@ function draw() {
         ctx.fillRect(tower.x * TILE_SIZE, tower.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
 
-    // draw enemies
+    // draw enemies as pixel sprites
     for (const enemy of enemies) {
-        ctx.fillStyle = enemy.color;
-        const size = TILE_SIZE * enemy.size;
-        ctx.fillRect(
-            enemy.x * TILE_SIZE + (TILE_SIZE - size) / 2,
-            enemy.y * TILE_SIZE + (TILE_SIZE - size) / 2,
-            size,
-            size
-        );
+        const frame = enemy.frames[Math.floor(enemy.frame)];
+        const size = TILE_SIZE / frame.length; // 10x10 grid
+        for (let y = 0; y < frame.length; y++) {
+            const row = frame[y];
+            for (let x = 0; x < row.length; x++) {
+                const code = row[x];
+                const color = enemy.palette[code];
+                if (!color) continue;
+                ctx.fillStyle = color;
+                ctx.fillRect(
+                    enemy.x * TILE_SIZE + x * size,
+                    enemy.y * TILE_SIZE + y * size,
+                    size,
+                    size
+                );
+            }
+        }
     }
 
     // draw floating damage numbers
